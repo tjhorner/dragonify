@@ -7,15 +7,23 @@ import { parser } from "stream-json/jsonl/Parser"
 export function getEventStream(docker: Docker): EventEmitter {
   const emitter = new EventEmitter()
 
-  docker.getEvents((err, rawStream) => {
+  opts = {
+    type: "container",
+  }
+
+  docker.getEvents(opts, (err, rawStream) => {
     const stream = chain<any[]>([
       rawStream,
       parser()
     ])
 
     stream.on("data", (data) => {
-      const event = data.value
-      emitter.emit(`${event.Type}.${event.Action}`, data.value)
+      const eventTypeAction = data.value.Type + data.value.Action
+      if (eventTypeAction !== "container.start" && eventTypeAction !== "container.stop") {
+        return
+      }
+
+      emitter.emit(eventTypeAction, data.value)
     })
   })
 
