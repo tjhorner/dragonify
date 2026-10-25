@@ -87,7 +87,7 @@ jobs:
     name: Deploy packages
     permissions:
       contents: read # needed for job 'lint_zizmor' and 'build'
-      actions: read # needed for job 'lint_zizmor'
+      security-events: write # needed for job 'lint_zizmor'
       packages: write # needed for job 'build'
       id-token: write # needed for job 'build'
     uses: $/.github/workflows/deploy.yml
