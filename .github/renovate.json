@@ -5,5 +5,13 @@
     "docker:pinDigests"
   ],
   "internalChecksFilter": "none",
-  "internalChecksAsSuccess": true
+  "internalChecksAsSuccess": true,
+  "packageRules": [
+    {
+      "matchManagers": ["docker-compose"],
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["docker/docker-compose.yml"],
+      "automerge": true
+    }
+  ]
 }
