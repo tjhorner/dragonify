@@ -1,0 +1,264 @@
+---
+name: Deploy
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+  release:
+    types:
+      - published
+  workflow_call:
+    inputs:
+      is_call:
+        type: boolean
+        default: true
+      tag:
+        default: ""
+        description: Tag for the release from ReleaseDrafter
+        required: false
+        type: string
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  queue: max
+
+env:
+  USERNAME: ${{ github.repository_owner }}
+  PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+
+
+jobs:
+  lint_zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # Required for upload-sarif (used by zizmor-action) to upload SARIF files.
+      # contents: read         # Only needed for private repos. Needed to clone the repo.
+      # actions: read          # Only needed for private repos. Needed for upload-sarif to read workflow run info.
+    steps:
+        # check out code from GitHub
+        - name: Checkout repository
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          with:
+            persist-credentials: false
+            ref: ${{ inputs.tag || github.sha }}
+        - name: Run zizmor 🌈
+          uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+
+  lint_shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+        # check out code from GitHub
+        - name: Checkout repository
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          with:
+            persist-credentials: false
+            ref: ${{ inputs.tag || github.sha }}
+        # check bash integrity
+        - name: Run ShellCheck
+          uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+          with:
+            scandir: './docker'
+            severity: warning
+          env:
+            SHELLCHECK_OPTS: -s bash
+
+  lint_hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+    steps:
+        # check out code from GitHub
+        - name: Checkout repository
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          with:
+            persist-credentials: false
+            ref: ${{ inputs.tag || github.sha }}
+        # check dockerfile integrity
+        - name: Run hadolint
+          uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+          with:
+              ignore: DL3002
+              dockerfile: ./docker/Dockerfile
+        - name: Run hadolint
+          uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+          with:
+              ignore: DL3002
+              dockerfile: ./docker/Dockerfile.Dev
+
+  lint_dockercompose:
+    name: test docker-compose
+    runs-on: ubuntu-latest
+    steps:
+        # check out code from GitHub
+        - name: Checkout repository
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          with:
+            persist-credentials: false
+            ref: ${{ inputs.tag || github.sha }}
+        # check compose.yml integrity
+        - name: Lint docker-compose.yml
+          run: |
+            docker compose -f docker/docker-compose.yml config --quiet
+
+  check_pinned_package:
+    name: Docker Pinned Package Check
+    runs-on: ubuntu-latest
+    steps:
+        # check out code from GitHub
+        - name: Checkout repository
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          with:
+            persist-credentials: false
+            ref: ${{ inputs.tag || github.sha }}
+        # check compose.yml integrity
+        - name: Check dockerfile
+          uses: casse-boubou/gitaction-test@9c513483c678e497c5f9e982a34c95f8ffd913d6 # main
+          with:
+            dockerfile: 'docker/Dockerfile'
+        - name: Check dockerfile
+          uses: casse-boubou/gitaction-test@9c513483c678e497c5f9e982a34c95f8ffd913d6 # main
+          with:
+            dockerfile: 'docker/Dockerfile.Dev'
+
+
+
+
+  build:
+    needs:
+      - lint_zizmor
+      - lint_shellcheck
+      - lint_hadolint
+      - lint_dockercompose
+      - check_pinned_package
+    name: Build docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # needed for signing the images with GitHub OIDC Token
+
+    steps:
+        # check out code from GitHub
+        - name: Checkout repository
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          with:
+            persist-credentials: false
+            ref: ${{ inputs.tag || github.sha }}
+
+        # Set up QEMU for allow possibility to buil multi arch
+        # https://github.com/docker/setup-qemu-action
+        - name: Set up QEMU
+          uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+        # Set up BuildKit Docker container builder to be able to build
+        # multi-platform images and export cache
+        # https://github.com/docker/setup-buildx-action
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+        # Login against a Docker registry except on PR
+        # https://github.com/docker/login-action
+        - name: Log in to the Container registry
+          if: |
+            github.event_name == 'pull_request' ||
+            github.event_name == 'release' ||
+            inputs.is_call == true
+          uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+          with:
+            registry: ${{ env.REGISTRY }}
+            username: ${{ env.USERNAME }}
+            password: ${{ env.PASSWORD }}
+
+        # Extract metadata (tags, labels) for Docker
+        # https://github.com/docker/metadata-action
+        - name: Extract Docker metadata
+          id: metadata
+          uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+          with:
+            images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            tags: |
+              # Following TAG are for tag the branche
+              type=raw,value=${{ github.head_ref }},enable=${{ github.event_name == 'pull_request' }}
+              # Following TAG are always apply
+              type=sha,prefix=commit_sha-,format=short,enable=true
+              # Following TAG are applied IF event from 'release' or worflow_call
+              type=raw,value=latest,enable=${{ github.event_name == 'release' || inputs.is_call == true }}
+              type=semver,pattern={{version}},prefix=v,value=${{ inputs.tag || github.ref_name }},enable=${{ github.event_name == 'release'  || inputs.is_call == true }}
+
+        - name: Set container build version
+          id: container_version
+          env:
+            GITHUB_SHA: ${{ github.sha }}
+            TAG_NAME: ${{ inputs.tag || (github.event_name == 'release' && github.ref_name) || '' }}
+          run: |
+            # Set container build version
+            if [ -n "$TAG_NAME" ]; then
+              echo "container_build_version=$TAG_NAME" >> "$GITHUB_OUTPUT"
+              echo "Container build version is $TAG_NAME"
+            else
+              echo "container_build_version=commit_sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+              echo "Container build version is commit_sha-${GITHUB_SHA}"
+            fi
+
+        # Build and push Docker image with Buildx (build if release or PR)
+        # https://github.com/docker/build-push-action
+        - name: Build and push Docker image
+          id: build-and-push
+          uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+          with:
+            context: ./docker
+            file: ./docker/Dockerfile
+            platforms: linux/amd64
+            push: ${{ github.event_name == 'pull_request' || github.event_name == 'release' || inputs.is_call == true }}
+            sbom: true
+            tags: ${{ steps.metadata.outputs.tags }}
+            labels: ${{ steps.metadata.outputs.labels }}
+            build-args: |
+              CONTAINER_BUILD_VERSION=${{ steps.container_version.outputs.container_build_version }}
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
+
+        # Install the cosign tool except on PR
+        # https://github.com/sigstore/cosign-installer
+        - name: Install cosign
+          if: ${{ github.event_name == 'release' || inputs.is_call == true }}
+          uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+        # Sign the resulting Docker image digest except on PRs.
+        # This will only write to the public Rekor transparency log when the Docker
+        # repository is public to avoid leaking data.  If you would like to publish
+        # transparency data even for private images, pass --force to cosign below.
+        # https://github.com/sigstore/cosign
+        - name: Sign the published Docker image
+          if: ${{ github.event_name == 'release' || inputs.is_call == true }}
+          env:
+            TAGS: ${{ steps.metadata.outputs.tags }}
+            DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          # This step uses the identity token to provision an ephemeral certificate
+          # against the sigstore community Fulcio instance.
+          run: |
+            images=""
+            for tag in ${TAGS}; do
+              images+="${tag}@${DIGEST} "
+            done
+            echo "Signing: ${images}"
+            cosign sign --yes ${images}
+
+            # Vérification immédiate de la signature
+            echo "Verifying signature..."
+            cosign verify \
+              --certificate-identity-regexp="^https://github.com/${{ github.repository }}" \
+              --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+              "ghcr.io/${{ github.repository }}@${DIGEST}"

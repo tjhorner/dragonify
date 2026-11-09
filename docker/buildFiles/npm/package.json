@@ -1,0 +1,30 @@
+{
+  "name": "dragonify",
+  "version": "2.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --outfile=dist/index.js --external:dockerode --packages=external"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/dockerode": "^4.0.1",
+    "@types/stream-json": "^1.7.8",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "dockerode": "^5.0.1",
+    "p-queue": "^10.0.0",
+    "stream-chain": "^4.2.5",
+    "stream-json": "^3.5.0",
+    "winston": "^3.19.0"
+  }
+}

@@ -1,0 +1,19 @@
+services:
+  dragonify:
+    container_name: dragonify
+    image: ghcr.io/casse-boubou/dragonify:v1.2.0@sha256:356fedc060e313c571c96126a7aedfd8b7bfdb2eb7dac5f77582c17f56f73493
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - TZ=Etc/UTC
+      - LOG_LEVEL=info
+      - CONNECT_ALL=false
+      - CUSTOMS_NETWORKS=ix-dragonify_default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -1,6 +1,0 @@
-services:
-  redis:
-    image: redis:alpine
-    network_mode: none
-    ports:
-      - "6379:6379"

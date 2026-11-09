@@ -1,6 +1,0 @@
-services:
-  dragonify:
-    image: ghcr.io/tjhorner/dragonify:main
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock

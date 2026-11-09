@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>casse-boubou/.github//.github/renovate.json",
+    "docker:pinDigests"
+  ],
+  "internalChecksFilter": "none",
+  "internalChecksAsSuccess": true,
+  "packageRules": [
+    {
+      "matchManagers": ["docker-compose"],
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["docker/docker-compose.yml"],
+      "automerge": true
+    }
+  ]
+}

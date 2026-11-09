@@ -1,0 +1,16 @@
+#!/bin/busybox sh
+# healthcheck.sh
+
+
+SERVER_PID=$(/bin/busybox pgrep -f "node /app/index.js")
+if [ -z "$SERVER_PID" ]; then
+    echo "process not running"
+    exit 1
+fi
+
+if [ ! -f "$HEARTBEAT_FILE" ]; then
+    echo "heartbeat file missing"
+    exit 1
+fi
+
+exit 0
