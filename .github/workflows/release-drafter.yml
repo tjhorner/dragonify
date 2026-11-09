@@ -70,7 +70,26 @@ jobs:
           REPO: ${{ github.repository }}
           RELEASE_ID: ${{ needs.draft_release.outputs.id }}
         run: |
-          if [ "$EVENT_NAME" = "schedule" ] && [[ "$BODY" != *"No changes"* ]]; then
+          FILTERED=""
+          IGNORE_SECTION=false
+
+          while IFS= read -r line; do
+            if [[ "$line" == "## "* ]]; then
+              if [[ "$line" == *"📚 Documentation" ]]; then
+                IGNORE_SECTION=true
+              else
+                IGNORE_SECTION=false
+              fi
+            fi
+
+            if [ "$IGNORE_SECTION" = false ]; then
+              FILTERED+="$line"$'\n'
+            fi
+          done <<< "$BODY"
+
+          TOTAL=$(printf '%s\n' "$FILTERED" | grep -cE '^[[:space:]]*- ' || true)
+
+          if [ "$EVENT_NAME" = "schedule" ] && [ "$TOTAL" -gt 0 ]; then
             echo "Release will be publish and deploy"
             gh api -X PATCH "repos/${REPO}/releases/${RELEASE_ID}" -F draft=false
             echo "deploy_is_need=true" >> "$GITHUB_OUTPUT"
