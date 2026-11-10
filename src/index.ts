@@ -64,8 +64,8 @@ function isContainerInNetwork(container: Docker.ContainerInfo) {
   return container.NetworkSettings.Networks[NETWORK_NAME] !== undefined
 }
 
-function isIxProjectName(name: string) {
-  return name.startsWith("ix-")
+function isIxProjectName(name: string | undefined) {
+  return name?.startsWith("ix-") ?? false
 }
 
 function isIxAppContainer(container: Docker.ContainerInfo) {
