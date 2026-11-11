@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^24.1.0",
+    "@types/node": "^26.0.0",
     "@types/dockerode": "^4.0.1",
     "@types/stream-json": "^1.7.8",
     "esbuild": "^0.28.2",
