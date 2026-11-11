@@ -31,7 +31,7 @@ RUN npm ci --omit=dev
 ##################################
 # DRAGONIFY
 ##################################
-FROM gcr.io/distroless/nodejs24-debian13:latest@sha256:5267d46378d4bd2955fb9f546fc6a8570757a330234e6a9557b57c1c3c16de0a AS worker
+FROM gcr.io/distroless/nodejs24-debian13:latest@sha256:a23422cc0dee3bbd0f080b2840e20df4727f60f3dda7c860fe9a127822711b1e AS worker
 ARG CONTAINER_BUILD_VERSION
 ENV CONTAINER_BUILD_VERSION=${CONTAINER_BUILD_VERSION}
 COPY --from=busybox /bin/busybox /bin/busybox
